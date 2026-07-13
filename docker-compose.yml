@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  capibara-redis:
+    image: redis:7-alpine
+    container_name: capibara-redis
+    ports:
+      - "6379:6379"
+    restart: always
+
+  postgres_db:
+    image: postgres:15-alpine
+    container_name: capibara_vpn_db
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata_local:/var/lib/postgresql/data
+    restart: always
+
+volumes:
+  pgdata_local:
