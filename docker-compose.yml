@@ -20,6 +20,14 @@ services:
     volumes:
       - pgdata_local:/var/lib/postgresql/data
     restart: always
-
+  capibara_bot:
+    build: .
+    container_name: capibara_bot
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - postgres_db
+      - capibara-redis
 volumes:
   pgdata_local:
