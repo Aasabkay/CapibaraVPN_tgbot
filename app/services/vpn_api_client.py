@@ -127,17 +127,18 @@ class ApiBotClient:
         return results
 
     # ==================================================================================================================
-    async def get_user_email(self, user_id) -> str:
+    async def get_user_email(self, user_id) -> list:
     # ==================================================================================================================
         """Функция для определения email(имени пользователя) из ключа"""
+
         inbound_list = await self.get_inbounds()  # Получаем все инбаунды
 
         # Проверка на пустой словарь, чтобы программа не упала
         if inbound_list is None:
-            return ''
+            return []
 
         # Имя пользователя в ключе
-        user_key_name = ''
+        user_emails = []
 
         # Цикл проверки инбаундов
         for inbound in inbound_list:
@@ -157,9 +158,9 @@ class ApiBotClient:
                         if telegram_id.isdigit():
                             telegram_id = int(telegram_id)
                             if user_id == telegram_id:
-                                user_key_name = user_name
+                                user_emails.append(user_name)
                         else:
                             continue
                     else:
                         continue
-        return user_key_name
+        return user_emails

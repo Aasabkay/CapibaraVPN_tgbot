@@ -217,10 +217,15 @@ async def users_keys_update(callback: CallbackQuery, bot_api_client: ApiBotClien
                 await callback.bot.send_message(chat_id=user_id,
                                                 text='<b>Появилось обновление ключей!</b> 📨')
 
-                user_email = await bot_api_client.get_user_email(user_id)
-                user_key_text = (f'🔑 <b>Ключ №{num}:</b>\n'
-                                 f'📜 <b>Название ключа:</b> {user_email}\n'
-                                 f'<code>{key}</code>')
+                user_emails = await bot_api_client.get_user_email(user_id)
+
+                header = "<b>Ваш ключ:</b>" if len(keys) == 1 else f"Ключ №{num}:"
+
+                user_key_text = (
+                    f'🔑 {header}\n'
+                    f'📜 <b>Название ключа:</b> {user_emails[num - 1]}\n'
+                    f'<code>{key}</code>'
+                )
 
                 await callback.bot.send_message(
                     chat_id=user_id,  # Отправляем ключ в чат пользователя

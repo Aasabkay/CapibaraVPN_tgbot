@@ -98,7 +98,7 @@ async def get_user_key(callback: CallbackQuery, bot_api_client: ApiBotClient):
 
     await callback.answer('Вы выбрали получить ключ(-и).')
 
-    # Получаем актуальные ключи для пользователя
+    # Получаем актуальные ключи для пользователя из БД
     users_data = await get_user_keys(callback.from_user.id)
 
     # Проверяем, есть ли у пользователя ключи
@@ -112,10 +112,15 @@ async def get_user_key(callback: CallbackQuery, bot_api_client: ApiBotClient):
 
     # Проходимся по массиву ключей и по очереди выдаем пользователю
     for num, key in enumerate(users_data, start=1):
-        key_email = await bot_api_client.get_user_email(callback.from_user.id)
-        user_key_text = (f'🔑 <b>Ключ №{num}:</b>\n'
-                         f'📜 <b>Название ключа:</b> {key_email}\n'
-                         f'<code>{key}</code>')
+        user_emails = await bot_api_client.get_user_email(callback.from_user.id)
+
+        header = "<b>Ваш ключ:</b>" if len(users_data) == 1 else f"Ключ №{num}:"
+
+        user_key_text = (
+            f'🔑 {header}\n'
+            f'📜 <b>Название ключа:</b> {user_emails[num - 1]}\n'
+            f'<code>{key}</code>'
+        )
 
         await callback.message.answer(text=user_key_text,
                                       disable_web_page_preview=True)
