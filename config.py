@@ -1,3 +1,5 @@
+"""Файл конфига для бота"""
+
 import os
 from dotenv import load_dotenv
 
@@ -20,3 +22,7 @@ PQV = os.getenv('PQV')
 PANEL_LOGIN = os.getenv('PANEL_LOGIN')
 PANEL_PASSWORD = os.getenv('PANEL_PASSWORD')
 PANEL_HOST = os.getenv('PANEL_HOST')
+REDIS_HOST = os.getenv('REDIS_HOST')
+REDIS_PORT = int(os.getenv('REDIS_PORT'))
+DB_HOST = os.getenv('DB_HOST')
+DB_PORT = int(os.getenv('DB_PORT'))

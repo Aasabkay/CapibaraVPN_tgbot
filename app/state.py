@@ -10,6 +10,7 @@ class AdminBroadcast(StatesGroup):
 class UserError(StatesGroup):
     waiting_for_error = State()
 
+# Состояние добавления ключа пользователю
 class AddKeyToUser(StatesGroup):
     id = State()
     keys_num = State()

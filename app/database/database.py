@@ -1,26 +1,34 @@
+"""Файл с функциями для связи бота и БД"""
+
+# Импорт необходимых библиотеки
 import asyncpg
 from typing import Optional
 from collections import defaultdict
+# Импорт необходимых зависимостей
+from config import DB_NAME, DB_PASSWORD, DB_USER, DB_HOST, DB_PORT
 
-from config import DB_NAME, DB_PASSWORD, DB_USER
-
+# Инициализируем пул соединений с БД
 pool: Optional[asyncpg.Pool] = None
 
-async def db_init():
+# ==================================================================================================================
+async def db_init() -> None:
+# ==================================================================================================================
+    """Инициализация базы данных"""
     global pool
 
+    # Создаем пул соединений
     pool = await asyncpg.create_pool(
         user=DB_USER,
         password=DB_PASSWORD,
         database=DB_NAME,
-        host='localhost',
-        port=5433
+        host=DB_HOST,
+        port=DB_PORT
     )
 
     if pool is None:
         raise RuntimeError("Не удалось инициализировать пул базы данных.")
 
-    async with pool.acquire() as conn:
+    async with pool.acquire() as conn:  # Берем из пула соединений одно свободное
         await conn.execute('''
         CREATE TABLE IF NOT EXISTS users (
         telegram_id BIGINT PRIMARY KEY,
@@ -37,7 +45,12 @@ async def db_init():
 
     print('База данных инициализирована.')
 
-async def add_user(telegram_id: int, username: Optional[str]):
+# ==================================================================================================================
+async def add_user(telegram_id: int, username: Optional[str]) -> None:
+# ==================================================================================================================
+    """Функция добавления пользователя в БД в таблицу users"""
+
+    # Проверка на случай ошибки инициализации пула
     if pool is None:
         print("Ошибка: Пул базы данных не инициализирован!")
         return
@@ -49,7 +62,11 @@ async def add_user(telegram_id: int, username: Optional[str]):
         ''', telegram_id, username)
     print(f'Пользователь @{username} с ID: {telegram_id} был успешно добавлен.')
 
-async def add_key(user_id: int, key: str):
+# ==================================================================================================================
+async def add_key(user_id: int, key: str) -> None:
+# ==================================================================================================================
+    """Функция добавления ключа конкретному пользователю"""
+
     if pool is None:
         print("Ошибка: Пул базы данных не инициализирован!")
         return
@@ -61,7 +78,11 @@ async def add_key(user_id: int, key: str):
 
     print(f'Для пользователя {user_id} был добавлен ключ {key}')
 
-async def get_user_keys(user_id: int):
+# ==================================================================================================================
+async def get_user_keys(user_id: int) -> list:
+# ==================================================================================================================
+    """Функция, которая получается все ключи конкретного пользователя"""
+
     if pool is None:
         print("Ошибка: Пул базы данных не инициализирован!")
         return []
@@ -73,7 +94,11 @@ async def get_user_keys(user_id: int):
 
     return keys
 
-async def delete_user_keys(user_id: int):
+# ==================================================================================================================
+async def delete_user_keys(user_id: int) -> None:
+# ==================================================================================================================
+    """Функция удаления всех ключей у пользователя"""
+
     if pool is None:
         print("Ошибка: Пул базы данных не инициализирован!")
         return
@@ -83,7 +108,11 @@ async def delete_user_keys(user_id: int):
         DELETE FROM vpn_keys WHERE user_id = $1;
         ''', user_id)
 
-async def get_users_key_data():
+# ==================================================================================================================
+async def get_users_key_data() -> dict:
+# ==================================================================================================================
+    """Функция получения всех ключей всех пользователей"""
+
     if pool is None:
         print("Ошибка: Пул базы данных не инициализирован!")
         return {}
@@ -91,14 +120,19 @@ async def get_users_key_data():
     async with pool.acquire() as conn:
         rows = await conn.fetch('''SELECT * FROM vpn_keys;''')
 
-        grouped_data = defaultdict(list)
+        grouped_data = defaultdict(list)  # Создаем словарь
 
+        # Идем по строкам из БД и распределяем их по владельцам
         for row in rows:
             grouped_data[row['user_id']].append(row['key_value'])
 
         return dict(grouped_data)
 
-async def get_all_users():
+# ==================================================================================================================
+async def get_all_users() -> list:
+# ==================================================================================================================
+    """Функция, которая получает всех пользователей из таблицы users"""
+
     if pool is None:
         print("Ошибка: Пул базы данных не инициализирован!")
         return []
