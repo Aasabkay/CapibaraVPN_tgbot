@@ -32,7 +32,8 @@ async def db_init() -> None:
         await conn.execute('''
         CREATE TABLE IF NOT EXISTS users (
         telegram_id BIGINT PRIMARY KEY,
-        username VARCHAR(255)
+        username VARCHAR(255),
+        role TEXT
         );
         ''')
         await conn.execute('''
@@ -46,9 +47,9 @@ async def db_init() -> None:
     print('База данных инициализирована.')
 
 # ==================================================================================================================
-async def add_user(telegram_id: int, username: Optional[str]) -> None:
+async def set_user_role(telegram_id: int, role: str) -> None:
 # ==================================================================================================================
-    """Функция добавления пользователя в БД в таблицу users"""
+    """Функция, устанавливающая роль пользователя"""
 
     # Проверка на случай ошибки инициализации пула
     if pool is None:
@@ -57,10 +58,41 @@ async def add_user(telegram_id: int, username: Optional[str]) -> None:
 
     async with pool.acquire() as conn:
         await conn.execute('''
-        INSERT INTO users (telegram_id, username) VALUES ($1, $2)
+        UPDATE users SET role =  $1 WHERE telegram_id = $2;
+        ''', role, telegram_id)
+
+# ==================================================================================================================
+async def get_user_role(telegram_id: int) -> str:
+# ==================================================================================================================
+    """Функция, получающая с БД роль пользователя"""
+
+    if pool is None:
+        print("Ошибка: Пул базы данных не инициализирован!")
+        return ''
+
+    async with pool.acquire() as conn:
+        user_row = await conn.fetchrow('''
+        SELECT role FROM users WHERE telegram_id = $1;
+        ''', telegram_id)
+
+        return user_row['role']
+
+# ==================================================================================================================
+async def add_user(telegram_id: int, username: Optional[str], role: str) -> None:
+# ==================================================================================================================
+    """Функция добавления пользователя в БД в таблицу users"""
+
+    if pool is None:
+        print("Ошибка: Пул базы данных не инициализирован!")
+        return
+
+    async with pool.acquire() as conn:
+        await conn.execute('''
+        INSERT INTO users (telegram_id, username, role) VALUES ($1, $2, $3)
         ON CONFLICT (telegram_id) DO NOTHING;
-        ''', telegram_id, username)
-    print(f'Пользователь @{username} с ID: {telegram_id} был успешно добавлен.')
+        ''', telegram_id, username, role)
+
+        print(f'Пользователь @{username} с ID: {telegram_id} был успешно добавлен.')
 
 # ==================================================================================================================
 async def add_key(user_id: int, key: str) -> None:
@@ -76,7 +108,7 @@ async def add_key(user_id: int, key: str) -> None:
         INSERT INTO vpn_keys (user_id, key_value) VALUES ($1, $2);
         ''', user_id, key)
 
-    print(f'Для пользователя {user_id} был добавлен ключ {key}')
+        print(f'Для пользователя {user_id} был добавлен ключ {key}')
 
 # ==================================================================================================================
 async def get_user_keys(user_id: int) -> list:
@@ -92,6 +124,7 @@ async def get_user_keys(user_id: int) -> list:
 
         keys = [row['key_value'] for row in rows]
 
+        print(f'Ключи для пользователя {user_id} были выданы.')
     return keys
 
 # ==================================================================================================================
@@ -107,6 +140,8 @@ async def delete_user_keys(user_id: int) -> None:
         await conn.execute('''
         DELETE FROM vpn_keys WHERE user_id = $1;
         ''', user_id)
+
+        print(f'Все ключи для пользователя {user_id} были удалены')
 
 # ==================================================================================================================
 async def get_users_key_data() -> dict:
@@ -126,6 +161,7 @@ async def get_users_key_data() -> dict:
         for row in rows:
             grouped_data[row['user_id']].append(row['key_value'])
 
+        print(f'Ключи для пользователей были выданы.')
         return dict(grouped_data)
 
 # ==================================================================================================================
@@ -142,5 +178,6 @@ async def get_all_users() -> list:
 
         users = [row['telegram_id'] for row in rows]
 
+        print('Все пользователи были выведены.')
         return users
 

@@ -9,12 +9,12 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 
 # Импорт необходимых данных из конфига
-from config import ADMIN_ID, PANEL_HOST, PANEL_LOGIN, PANEL_PASSWORD
+from config import ADMIN_ID
 # Импорт клавиатуры и состояний
 from app.keyboards.inline import admin_inline
 from app.state import AdminBroadcast, AddKeyToUser
 # Импорт функций для работы с БД
-from app.database.database import add_key, delete_user_keys, get_all_users
+from app.database.database import add_key, delete_user_keys, get_all_users, set_user_role, get_user_role
 # Импорт API клиента
 from app.services.vpn_api_client import ApiBotClient
 # Инициализация роутера админа
@@ -173,11 +173,16 @@ async def add_keys(message: Message, state: FSMContext) -> None:
     # Получаем все ранее запрошенные данные
     user_data = await state.get_data()
 
+    user_id = int(user_data['id'])
+    await set_user_role(user_id, 'client')
+
     target_keys_count = int(user_data['keys_num'])  # Количество ключей, введенное админом
     uploaded_keys = user_data.get('keys', [])  # Список со всеми ключами
 
     current_key = message.text.strip()  # Забираем ключ из сообщения
+
     uploaded_keys.append(current_key)  # Тут же его добавляем в список
+    await add_key(user_id, current_key)  # Функция, которая добавляет запись в БД
 
     await state.update_data(keys=uploaded_keys)
     current_keys_num = len(uploaded_keys)
@@ -188,10 +193,6 @@ async def add_keys(message: Message, state: FSMContext) -> None:
                              f'📜 <b>Осталось еще {target_keys_count-current_keys_num}</b>.')
         return
     else:
-        for key in uploaded_keys:
-            data = await state.get_data()
-            user_id = int(data['id'])
-            await add_key(user_id, key)  # Функция, которая добавляет запись в БД
         await message.answer('✅ <b>Успешно приняты все ключи!</b> Что дальше?',
                              reply_markup=admin_inline)
         await state.clear()
@@ -205,7 +206,7 @@ async def users_keys_update(callback: CallbackQuery, bot_api_client: ApiBotClien
 
     await callback.answer('Вы выбрали обновить ключи пользователей.')
 
-    new_keys = await bot_api_client.get_client_keys()
+    new_keys = await bot_api_client.get_client_keys(inbound_id=1)
 
     # Цикл обновления ключей
     for user_id, keys in new_keys.items():

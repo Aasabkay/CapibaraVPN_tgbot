@@ -9,8 +9,8 @@ from aiogram.fsm.context import FSMContext
 # Импорт необходимых зависимостей
 from app.keyboards.inline import user_inline
 from app.state import UserError
-from config import ADMIN_ID, PANEL_HOST, PANEL_LOGIN, PANEL_PASSWORD
-from app.database.database import add_user, get_user_keys, get_all_users
+from config import ADMIN_ID
+from app.database.database import add_user, get_user_keys, get_all_users, set_user_role, get_user_role
 from app.services.vpn_api_client import ApiBotClient
 
 # Инициализация роутера пользователя
@@ -41,7 +41,7 @@ async def user_start(message: Message):
                      f'<b>Username</b>: @{message.from_user.username}')
 
         await message.bot.send_message(chat_id=ADMIN_ID, text=user_info)
-        await add_user(message.from_user.id, message.from_user.username)
+        await add_user(message.from_user.id, message.from_user.username, 'stranger')
 
 # ==================================================================================================================
 @user_router.message(Command("menu"))
@@ -58,6 +58,12 @@ async def menu(message: Message):
 async def send_error(callback: CallbackQuery, state: FSMContext):
 # ==================================================================================================================
     """Функция устанавливает статус ожидания сообщения от пользователя"""
+
+    user_role = await get_user_role(callback.from_user.id)
+
+    if user_role == 'stranger':
+        print('Сожалею, но пока администратор не добавил вам ключи, ваша роль не позволяет отправлять ему жалобы.')
+        return
 
     await callback.answer('Вы выбрали написать о проблеме.')
     await callback.message.answer('<b>Опишите проблему</b> ✍️ или <b>прикрепите скриншот</b> 📱.')
@@ -93,13 +99,16 @@ async def report(message: Message, state: FSMContext):
 # ==================================================================================================================
 @user_router.callback_query(F.data == 'get_key')
 async def get_user_key(callback: CallbackQuery, bot_api_client: ApiBotClient):
-# ==================================================================================================================
+    # ==================================================================================================================
     """Функция, которая выдает из БД ключ пользователю"""
+
+    user_id = callback.from_user.id
+    user_role = await get_user_role(user_id)
 
     await callback.answer('Вы выбрали получить ключ(-и).')
 
     # Получаем актуальные ключи для пользователя из БД
-    users_data = await get_user_keys(callback.from_user.id)
+    users_data = await get_user_keys(user_id)
 
     # Проверяем, есть ли у пользователя ключи
     if not users_data:
@@ -110,15 +119,20 @@ async def get_user_key(callback: CallbackQuery, bot_api_client: ApiBotClient):
 
     await callback.message.answer('📜 <b>Ваши ключи:</b>')
 
+    if user_role == 'stranger':
+        await set_user_role(user_id, 'client')
+
+    user_emails = await bot_api_client.get_user_email(user_id)
+
     # Проходимся по массиву ключей и по очереди выдаем пользователю
     for num, key in enumerate(users_data, start=1):
-        user_emails = await bot_api_client.get_user_email(callback.from_user.id)
 
         header = "<b>Ваш ключ:</b>" if len(users_data) == 1 else f"Ключ №{num}:"
+        email = user_emails[num - 1] if num - 1 < len(user_emails) else "Без названия"
 
         user_key_text = (
             f'🔑 {header}\n'
-            f'📜 <b>Название ключа:</b> {user_emails[num - 1]}\n'
+            f'📜 <b>Название ключа:</b> {email}\n'
             f'<code>{key}</code>'
         )
 

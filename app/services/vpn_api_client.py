@@ -84,7 +84,7 @@ class ApiBotClient:
             return False
 
     # ==================================================================================================================
-    async def get_client_keys(self) -> dict:
+    async def get_client_keys(self, inbound_id: int) -> dict:
     # ==================================================================================================================
         """Функция предназначена для получения ключей пользователей"""
 
@@ -97,7 +97,7 @@ class ApiBotClient:
         results = {}
 
         for inbound in inbound_list:
-            if inbound['id'] == 1:  # Конкретно нужный инбаунд
+            if inbound['id'] == inbound_id:  # Конкретно нужный инбаунд
 
                 settings_list = json.loads(inbound['settings'])  # Превращаем json в dict
                 client_list = settings_list['clients']  # Список всех клиентов инбаунда
