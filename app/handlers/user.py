@@ -10,7 +10,7 @@ from aiogram.fsm.context import FSMContext
 from app.keyboards.inline import user_inline
 from app.state import UserError
 from config import ADMIN_ID
-from app.database.database import add_user, get_user_keys, get_all_users, set_user_role, get_user_role
+from app.database.database import add_user, get_user_keys, get_user_data, set_user_role, get_user_role
 from app.services.vpn_api_client import ApiBotClient
 
 # Инициализация роутера пользователя
@@ -23,8 +23,8 @@ async def user_start(message: Message):
 # ==================================================================================================================
     """Текст приветствия пользователя при первом запуске бота"""
 
-    # Получаем актуальные данные о всех пользователях
-    users_id = await get_all_users()
+    # Получаем данные о пользователе
+    user_info = await get_user_data(message.from_user.id)
 
     hello_text = (f'<b>Привет!</b>👋 <b>Я - CapibaraVPN, бот, созданный для удобства администрирования VPN ключей'
                   f' между пользователями!</b>\n'
@@ -35,13 +35,13 @@ async def user_start(message: Message):
     await message.answer(hello_text,
                          reply_markup=user_inline)
 
-    if message.from_user.id not in users_id:  # Проверка на наличие пользователя в БД
-        user_info = (f'<b>Зарегистрирован новый пользователь</b>\n'
+    if user_info is None:  # Проверка на наличие пользователя в БД
+        admin_message = (f'<b>Зарегистрирован новый пользователь</b>\n'
                      f'<b>ID</b>: {message.from_user.id}\n'
                      f'<b>Username</b>: @{message.from_user.username}')
 
-        await message.bot.send_message(chat_id=ADMIN_ID, text=user_info)
         await add_user(message.from_user.id, message.from_user.username, 'stranger')
+        await message.bot.send_message(chat_id=ADMIN_ID, text=admin_message)
 
 # ==================================================================================================================
 @user_router.message(Command("menu"))
@@ -62,7 +62,8 @@ async def send_error(callback: CallbackQuery, state: FSMContext):
     user_role = await get_user_role(callback.from_user.id)
 
     if user_role == 'stranger':
-        print('Сожалею, но пока администратор не добавил вам ключи, ваша роль не позволяет отправлять ему жалобы.')
+        await callback.message.answer('🚫 Сожалею, но пока администратор не добавил вам ключи, '
+                                      'ваша роль не позволяет отправлять ему жалобы.')
         return
 
     await callback.answer('Вы выбрали написать о проблеме.')
@@ -82,8 +83,8 @@ async def report(message: Message, state: FSMContext):
                      f'<b>Username:</b> @{message.from_user.username}')  # Сбор информации о пользователе
 
         await message.bot.send_message(chat_id=ADMIN_ID, text=user_info)  # Отправка админу
-
         await message.send_copy(chat_id=ADMIN_ID)  # Копия сообщения в чат админа
+
         await message.answer('✅ <b>Ваша жалоба была отправлена админу.</b>\n'
                              'Он просмотрит и исправит ее в ближайшее время. ✍️',
                              reply_markup=user_inline)
@@ -98,7 +99,7 @@ async def report(message: Message, state: FSMContext):
 # ========== 3. ПОЛУЧЕНИЕ КЛЮЧЕЙ ==========
 # ==================================================================================================================
 @user_router.callback_query(F.data == 'get_key')
-async def get_user_key(callback: CallbackQuery, bot_api_client: ApiBotClient):
+async def get_user_key(callback: CallbackQuery, bot_api_client: ApiBotClient) -> None:
     # ==================================================================================================================
     """Функция, которая выдает из БД ключ пользователю"""
 
@@ -122,7 +123,11 @@ async def get_user_key(callback: CallbackQuery, bot_api_client: ApiBotClient):
     if user_role == 'stranger':
         await set_user_role(user_id, 'client')
 
-    user_emails = await bot_api_client.get_user_email(user_id)
+    inbound_list = await bot_api_client.get_inbounds()
+    if inbound_list:
+        user_emails = await bot_api_client.get_user_email(user_id, 1, inbound_list)
+    else:
+        user_emails = []
 
     # Проходимся по массиву ключей и по очереди выдаем пользователю
     for num, key in enumerate(users_data, start=1):

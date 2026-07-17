@@ -3,7 +3,6 @@
 # Импорт необходимых библиотек
 import httpx
 import json
-from typing import Any
 # Импорт необходимых данных из .env
 from config import SERVER_IP, ENCRYPTION, SERVICE_NAME, PBK, FP, SNI, SID, SPX, PQV
 
@@ -56,7 +55,7 @@ class ApiBotClient:
         print('Закрываю соединение')
 
     # ==================================================================================================================
-    async def get_inbounds(self) -> Any:
+    async def get_inbounds(self) -> list | None:
     # ==================================================================================================================
         """Функция получения всех имеющихся inbounds"""
 
@@ -75,13 +74,13 @@ class ApiBotClient:
 
                 else:
                     print(f'Ошибка в получении инбаундов. Ошибка: {data.get("msg")}')
-                    return False
+                    return None
             else:
                 print(f'Ошибка подключения к серверу на этапе получения инбаундов. Статус-код: {response.status_code}')
-                return False
+                return None
         except Exception as e:
             print(f'Произошла ошибка при получении инбаундов: {e}')
-            return False
+            return None
 
     # ==================================================================================================================
     async def get_client_keys(self, inbound_id: int) -> dict:
@@ -91,7 +90,7 @@ class ApiBotClient:
         inbound_list = await self.get_inbounds()  # Получаем все актуальные инбаунды
 
         # Проверка на пустой словарь, чтобы программа не упала
-        if inbound_list is None:
+        if not inbound_list:
             return {}
 
         results = {}
@@ -127,14 +126,15 @@ class ApiBotClient:
         return results
 
     # ==================================================================================================================
-    async def get_user_email(self, user_id) -> list:
+    async def get_user_email(self, user_id, inbound_id: int, inbound_list: list[dict] | None = None) -> list:
     # ==================================================================================================================
         """Функция для определения email(имени пользователя) из ключа"""
 
-        inbound_list = await self.get_inbounds()  # Получаем все инбаунды
-
         # Проверка на пустой словарь, чтобы программа не упала
         if inbound_list is None:
+            inbound_list = await self.get_inbounds()
+
+        if not inbound_list:
             return []
 
         # Имя пользователя в ключе
@@ -142,11 +142,13 @@ class ApiBotClient:
 
         # Цикл проверки инбаундов
         for inbound in inbound_list:
-            if inbound['id'] == 1:  # Конкретно нужный инбаунд
-
-                # Импортируем json конфиг настроек и достаем список клиентов
-                settings_list = json.loads(inbound['settings'])
-                client_list = settings_list['clients']
+            if inbound['id'] == inbound_id:  # Конкретно нужный инбаунд
+                try:
+                    # Импортируем json конфиг настроек и достаем список клиентов
+                    settings_list = json.loads(inbound['settings'])
+                    client_list = settings_list['clients']
+                except (ValueError, KeyError):
+                    continue
 
                 # Цикл проверки клиентов на совпадение по telegram_id
                 for client in client_list:

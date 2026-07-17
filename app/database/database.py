@@ -4,6 +4,7 @@
 import asyncpg
 from typing import Optional
 from collections import defaultdict
+from asyncpg import Record
 # Импорт необходимых зависимостей
 from config import DB_NAME, DB_PASSWORD, DB_USER, DB_HOST, DB_PORT
 
@@ -68,12 +69,15 @@ async def get_user_role(telegram_id: int) -> str:
 
     if pool is None:
         print("Ошибка: Пул базы данных не инициализирован!")
-        return ''
+        return 'stranger'
 
     async with pool.acquire() as conn:
         user_row = await conn.fetchrow('''
         SELECT role FROM users WHERE telegram_id = $1;
         ''', telegram_id)
+
+        if user_row is None:
+            return 'stranger'
 
         return user_row['role']
 
@@ -111,7 +115,7 @@ async def add_key(user_id: int, key: str) -> None:
         print(f'Для пользователя {user_id} был добавлен ключ {key}')
 
 # ==================================================================================================================
-async def get_user_keys(user_id: int) -> list:
+async def get_user_keys(user_id: int) -> list[str]:
 # ==================================================================================================================
     """Функция, которая получается все ключи конкретного пользователя"""
 
@@ -144,7 +148,7 @@ async def delete_user_keys(user_id: int) -> None:
         print(f'Все ключи для пользователя {user_id} были удалены')
 
 # ==================================================================================================================
-async def get_users_key_data() -> dict:
+async def get_users_key_data() -> dict[int, list[str]]:
 # ==================================================================================================================
     """Функция получения всех ключей всех пользователей"""
 
@@ -164,8 +168,21 @@ async def get_users_key_data() -> dict:
         print(f'Ключи для пользователей были выданы.')
         return dict(grouped_data)
 
+async def get_user_data(telegram_id: int) -> Optional[Record]:
+
+    if pool is None:
+        print("Ошибка: Пул базы данных не инициализирован!")
+        return None
+
+    async with pool.acquire() as conn:
+        user_data = await conn.fetchrow('''SELECT * FROM users WHERE telegram_id = $1''', telegram_id)
+
+        print('Данные о пользователе были получены')
+
+        return user_data
+
 # ==================================================================================================================
-async def get_all_users() -> list:
+async def get_all_users_data() -> list[Record]:
 # ==================================================================================================================
     """Функция, которая получает всех пользователей из таблицы users"""
 
@@ -174,10 +191,8 @@ async def get_all_users() -> list:
         return []
 
     async with pool.acquire() as conn:
-        rows = await conn.fetch('''SELECT telegram_id FROM users;''')
-
-        users = [row['telegram_id'] for row in rows]
+        users_table = await conn.fetch('''SELECT * FROM users;''')
 
         print('Все пользователи были выведены.')
-        return users
+        return users_table
 

@@ -14,7 +14,7 @@ from config import ADMIN_ID
 from app.keyboards.inline import admin_inline
 from app.state import AdminBroadcast, AddKeyToUser
 # Импорт функций для работы с БД
-from app.database.database import add_key, delete_user_keys, get_all_users, set_user_role, get_user_role
+from app.database.database import add_key, delete_user_keys, get_all_users_data, set_user_role
 # Импорт API клиента
 from app.services.vpn_api_client import ApiBotClient
 # Инициализация роутера админа
@@ -66,8 +66,17 @@ async def broadcast(message: Message, state: FSMContext) -> None:
     success_count = 0
     error_count = 0
 
-    # Получаем актуальный список пользователей
-    users_id = await get_all_users()
+    # Получаем актуальную информацию о пользователях
+    users_data = await get_all_users_data()
+
+    if not users_data:
+        await message.answer('🚫 Не удалось получить данные о пользователях',
+                             reply_markup=admin_inline)
+        await state.clear()
+        return
+
+    # Получаем информацию о ID пользователей
+    users_id = [row['telegram_id'] for row in users_data]
 
     # Проверка на наличие пользователей в БД
     if not users_id:
@@ -112,19 +121,40 @@ async def show_all_users(callback: CallbackQuery) -> None:
     await callback.message.answer('📨 Вывожу всех пользователей...')
 
     # Получаем актуальный список пользователей
-    users_id = await get_all_users()
+
+
+    users_data = await get_all_users_data()
+
+    if not users_data:
+        await callback.message.answer('🚫 Не удалось получить данные о пользователях',
+                             reply_markup=admin_inline)
+        return
 
     try:
-        for num, user in enumerate(users_id, start=1):
-            user_chat = await callback.bot.get_chat(chat_id=user)  # Информация о пользователе по его ID
+        response_list = []
+        for num, user in enumerate(users_data, start=1):  # Информация о пользователе по его ID
 
-            response_text = (f'🙍‍♂️<b>Пользователь №{num}:</b>\n'
-                             f'📫<b>ID:</b> {user_chat.id}\n'
-                             f'💭<b>Username:</b> {user_chat.username}')
+            # noinspection PyTypeChecker
+            user_id = user['telegram_id']
+            # noinspection PyTypeChecker
+            username = f'@{user['username']}' if user['username'] else "Нет юзернейма"
 
-            await callback.message.answer(response_text)
+            response_instance = (f'🙍‍♂️<b>Пользователь №{num}:</b>\n'
+                                 f'📫<b>ID:</b> {user_id}\n'
+                                 f'💭<b>Username:</b> {username}')
+
+            response_list.append(response_instance)
+
+            if len(response_list) == 25 or num == len(users_data):
+                response_text = '\n'.join(response_list)
+                await callback.message.answer(response_text)
+
+                response_list.clear()
+
         await callback.message.answer('✅ <b>Успешно</b>, что делаем дальше?',
                                       reply_markup=admin_inline)
+
+        await asyncio.sleep(0.05)
     except Exception as e:
         await callback.message.answer(
             f'🚫 Произошла ошибка при попытке вывести пользователей. Ошибка: {e}',
@@ -150,6 +180,10 @@ async def get_keys_num(message: Message, state: FSMContext) -> None:
 # ==================================================================================================================
     """Функция отвечает за запрос количества ключей и назначение ID пользователя"""
 
+    if not message.text.isdigit():
+        await message.answer('🚫 Введите ID, <b>он состоит из цифр</b>.')
+        return
+
     await state.update_data(id=message.text)  # Запоминаем полученный ID пользователя из сообщения
     await state.set_state(AddKeyToUser.keys_num)  # Устанавливаем состояние ожидания количества ключей
     await message.answer('📫 Введите сколько ключей вы хотите добавить')
@@ -159,6 +193,11 @@ async def get_keys_num(message: Message, state: FSMContext) -> None:
 async def get_keys(message: Message, state: FSMContext) -> None:
 # ==================================================================================================================
     """Функция отвечает за запрос ключей и назначение количества ключей"""
+
+
+    if not message.text.isdigit():
+        await message.answer('🚫 Введите <b>число</b>!')
+        return
 
     await state.update_data(keys_num=message.text)  # Запоминаем количество ключей из сообщения
     await state.set_state(AddKeyToUser.key)  # Устанавливаем состояние ожидания ключей
@@ -174,7 +213,6 @@ async def add_keys(message: Message, state: FSMContext) -> None:
     user_data = await state.get_data()
 
     user_id = int(user_data['id'])
-    await set_user_role(user_id, 'client')
 
     target_keys_count = int(user_data['keys_num'])  # Количество ключей, введенное админом
     uploaded_keys = user_data.get('keys', [])  # Список со всеми ключами
@@ -195,6 +233,8 @@ async def add_keys(message: Message, state: FSMContext) -> None:
     else:
         await message.answer('✅ <b>Успешно приняты все ключи!</b> Что дальше?',
                              reply_markup=admin_inline)
+        await set_user_role(user_id, 'client')
+
         await state.clear()
 
 # ========== 5. ОБНОВЛЕНИЕ КЛЮЧА(-ЕЙ) ДЛЯ ПОЛЬЗОВАТЕЛЯ ==========
@@ -208,9 +248,13 @@ async def users_keys_update(callback: CallbackQuery, bot_api_client: ApiBotClien
 
     new_keys = await bot_api_client.get_client_keys(inbound_id=1)
 
+    inbound_list = await bot_api_client.get_inbounds()
+
     # Цикл обновления ключей
     for user_id, keys in new_keys.items():
         await delete_user_keys(user_id)  # Для конкретного пользователя полностью очищаем его ключи из БД
+
+        user_emails = await bot_api_client.get_user_email(user_id, 1, inbound_list)
 
         for num, key in enumerate(keys, start=1):
             await add_key(user_id, key)  # Из списка НОВЫХ ключей берем ключ и ID пользователя, добавляем в БД
@@ -218,13 +262,13 @@ async def users_keys_update(callback: CallbackQuery, bot_api_client: ApiBotClien
                 await callback.bot.send_message(chat_id=user_id,
                                                 text='<b>Появилось обновление ключей!</b> 📨')
 
-                user_emails = await bot_api_client.get_user_email(user_id)
-
                 header = "<b>Ваш ключ:</b>" if len(keys) == 1 else f"Ключ №{num}:"
+
+                email_name = user_emails[num - 1] if num - 1 < len(user_emails) else "Без названия"
 
                 user_key_text = (
                     f'🔑 {header}\n'
-                    f'📜 <b>Название ключа:</b> {user_emails[num - 1]}\n'
+                    f'📜 <b>Название ключа:</b> {email_name}\n'
                     f'<code>{key}</code>'
                 )
 
