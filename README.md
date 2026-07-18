@@ -63,8 +63,9 @@
 ```
 
 # ⚙️ Установка и запуск / Installation & Setup
-[RU] Бот упакован в Docker, что делает его развертывание на сервере (VPS) максимально быстрым.
-[EN] The bot is dockerized, making its deployment on a server (VPS) as fast as possible.
+**[RU]** Бот упакован в Docker, что делает его развертывание на сервере (VPS) максимально быстрым.
+
+**[EN]** The bot is dockerized, making its deployment on a server (VPS) as fast as possible.
 
 * **1. Клонирование репозитория / Clone the repository**
 ```bash
@@ -72,16 +73,18 @@ git clone https://github.com/Aasabkay/CapibaraVPN_tgbot.git
 cd CapibaraVPN_tgbot
 ```
 * **2. Настройка переменных окружения / Environment configuration**
-[RU] Создайте файл .env на основе шаблона `.env.example` и заполните свои данные (токен бота, доступы к БД и 3X-UI панели).
-[EN] Create an .env file based on the template `.env.example` and fill in your credentials (bot token, DB access, and 3X-UI panel details).
+**[RU]** Создайте файл .env на основе шаблона `.env.example` и заполните свои данные (токен бота, доступы к БД и 3X-UI панели).
+
+**[EN]** Create an .env file based on the template `.env.example` and fill in your credentials (bot token, DB access, and 3X-UI panel details).
 ```bash
 cp .env.example .env
 nano .env
 ```
 
 * **3. Запуск через Docker Compose / Run with Docker Compose**
-[RU] Рекомендуется использовать флаг -d для фонового запуска. Параметр restart: unless-stopped уже прописан в манифесте для автоматического перезапуска.
-[EN] It is recommended to use the -d flag for background execution. The restart: unless-stopped parameter is already set in the manifest for auto-restarts.
+**[RU]** Рекомендуется использовать флаг -d для фонового запуска. Параметр restart: unless-stopped уже прописан в манифесте для автоматического перезапуска.
+
+**[EN]** It is recommended to use the -d flag for background execution. The restart: unless-stopped parameter is already set in the manifest for auto-restarts.
 ```bash
 docker compose up -d --build
 ```
