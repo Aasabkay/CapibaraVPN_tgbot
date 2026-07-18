@@ -14,7 +14,7 @@ from config import ADMIN_ID
 from app.keyboards.inline import admin_inline
 from app.state import AdminBroadcast, AddKeyToUser
 # Импорт функций для работы с БД
-from app.database.database import add_key, delete_user_keys, get_all_users_data, set_user_role
+from app.database.database import add_key, delete_user_keys, get_all_users_data, set_user_role, get_user_role
 # Импорт API клиента
 from app.services.vpn_api_client import ApiBotClient
 # Инициализация роутера админа
@@ -278,9 +278,13 @@ async def users_keys_update(callback: CallbackQuery, bot_api_client: ApiBotClien
                     disable_web_page_preview=True
                 )
 
+
                 await asyncio.sleep(0.05)
+
             except Exception as e:
                 print(f'🚫 Ошибка отправки сообщения пользователю {user_id}: {e}')
+
+        await set_user_role(user_id, 'client')
 
     await callback.message.answer(
         text='Вы отправили все известные ключи. Что-нибудь ещё?',

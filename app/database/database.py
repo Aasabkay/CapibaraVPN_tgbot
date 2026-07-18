@@ -30,7 +30,7 @@ async def db_init() -> None:
         raise RuntimeError("Не удалось инициализировать пул базы данных.")
 
     async with pool.acquire() as conn:  # Берем из пула соединений одно свободное
-        await conn.execute('''
+        await conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
         telegram_id BIGINT PRIMARY KEY,
         username VARCHAR(255),
@@ -43,7 +43,7 @@ async def db_init() -> None:
         user_id BIGINT REFERENCES users(telegram_id) ON DELETE CASCADE,
         key_value TEXT NOT NULL
         );
-        ''')
+        """)
 
     print('База данных инициализирована.')
 
@@ -58,9 +58,9 @@ async def set_user_role(telegram_id: int, role: str) -> None:
         return
 
     async with pool.acquire() as conn:
-        await conn.execute('''
-        UPDATE users SET role =  $1 WHERE telegram_id = $2;
-        ''', role, telegram_id)
+        await conn.execute("""
+        UPDATE users SET role =  $1 WHERE telegram_id = $2 AND role = 'stranger';
+        """, role, telegram_id)
 
 # ==================================================================================================================
 async def get_user_role(telegram_id: int) -> str:
@@ -72,9 +72,9 @@ async def get_user_role(telegram_id: int) -> str:
         return 'stranger'
 
     async with pool.acquire() as conn:
-        user_row = await conn.fetchrow('''
+        user_row = await conn.fetchrow("""
         SELECT role FROM users WHERE telegram_id = $1;
-        ''', telegram_id)
+        """, telegram_id)
 
         if user_row is None:
             return 'stranger'
@@ -91,10 +91,10 @@ async def add_user(telegram_id: int, username: Optional[str], role: str) -> None
         return
 
     async with pool.acquire() as conn:
-        await conn.execute('''
+        await conn.execute("""
         INSERT INTO users (telegram_id, username, role) VALUES ($1, $2, $3)
         ON CONFLICT (telegram_id) DO NOTHING;
-        ''', telegram_id, username, role)
+        """, telegram_id, username, role)
 
         print(f'Пользователь @{username} с ID: {telegram_id} был успешно добавлен.')
 
@@ -108,9 +108,9 @@ async def add_key(user_id: int, key: str) -> None:
         return
 
     async with pool.acquire() as conn:
-        await conn.execute('''
+        await conn.execute("""
         INSERT INTO vpn_keys (user_id, key_value) VALUES ($1, $2);
-        ''', user_id, key)
+        """, user_id, key)
 
         print(f'Для пользователя {user_id} был добавлен ключ {key}')
 
@@ -124,7 +124,7 @@ async def get_user_keys(user_id: int) -> list[str]:
         return []
 
     async with pool.acquire() as conn:
-        rows = await conn.fetch('''SELECT * FROM vpn_keys WHERE (user_id = $1);''', user_id)
+        rows = await conn.fetch("""SELECT * FROM vpn_keys WHERE (user_id = $1);""", user_id)
 
         keys = [row['key_value'] for row in rows]
 
@@ -141,9 +141,9 @@ async def delete_user_keys(user_id: int) -> None:
         return
 
     async with pool.acquire() as conn:
-        await conn.execute('''
+        await conn.execute("""
         DELETE FROM vpn_keys WHERE user_id = $1;
-        ''', user_id)
+        """, user_id)
 
         print(f'Все ключи для пользователя {user_id} были удалены')
 
@@ -157,7 +157,7 @@ async def get_users_key_data() -> dict[int, list[str]]:
         return {}
 
     async with pool.acquire() as conn:
-        rows = await conn.fetch('''SELECT * FROM vpn_keys;''')
+        rows = await conn.fetch("""SELECT * FROM vpn_keys;""")
 
         grouped_data = defaultdict(list)  # Создаем словарь
 
@@ -175,7 +175,7 @@ async def get_user_data(telegram_id: int) -> Optional[Record]:
         return None
 
     async with pool.acquire() as conn:
-        user_data = await conn.fetchrow('''SELECT * FROM users WHERE telegram_id = $1''', telegram_id)
+        user_data = await conn.fetchrow("""SELECT * FROM users WHERE telegram_id = $1""", telegram_id)
 
         print('Данные о пользователе были получены')
 
@@ -191,7 +191,7 @@ async def get_all_users_data() -> list[Record]:
         return []
 
     async with pool.acquire() as conn:
-        users_table = await conn.fetch('''SELECT * FROM users;''')
+        users_table = await conn.fetch("""SELECT * FROM users;""")
 
         print('Все пользователи были выведены.')
         return users_table
