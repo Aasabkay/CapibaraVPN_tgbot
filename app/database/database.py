@@ -36,8 +36,8 @@ async def db_init() -> None:
         username VARCHAR(255),
         role TEXT
         );
-        ''')
-        await conn.execute('''
+        """)
+        await conn.execute("""
         CREATE TABLE IF NOT EXISTS vpn_keys (
         id SERIAL PRIMARY KEY,
         user_id BIGINT REFERENCES users(telegram_id) ON DELETE CASCADE,
